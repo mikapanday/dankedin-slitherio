@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DankedIn - Slither.io LinkedIn Style</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="phone-screen">
+            <div class="game-header">
+                <h1>DankedIn</h1>
+                <div class="score">Length: <span id="score">0</span></div>
+            </div>
+            <canvas id="gameCanvas"></canvas>
+            <div class="game-overlay" id="gameOverlay">
+                <div class="overlay-content">
+                    <h2>Game Over</h2>
+                    <p>Final Length: <span id="finalScore">0</span></p>
+                    <button onclick="restartGame()">Play Again</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>
