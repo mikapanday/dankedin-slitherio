@@ -54,7 +54,7 @@ body {
     padding: 15px 20px;
     color: white;
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
@@ -64,9 +64,47 @@ body {
     font-weight: 700;
 }
 
-.score {
+.likes-display {
+    background: #ffffff;
+    padding: 12px 20px;
+    text-align: center;
+    color: #0077b5;
     font-size: 16px;
     font-weight: 600;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    border-radius: 25px;
+    margin: 10px 20px;
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: default;
+}
+
+.likes-display:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.likes-display span {
+    color: #0077b5;
+    font-weight: 700;
+}
+
+.likes-counter {
+    background: rgba(255, 255, 255, 0.15);
+    padding: 10px 20px;
+    border-radius: 20px;
+    margin-bottom: 20px;
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    display: inline-block;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.likes-counter span {
+    color: white;
+    font-weight: 700;
+    font-size: 18px;
 }
 
 #gameCanvas {
@@ -96,10 +134,18 @@ body {
     display: flex;
 }
 
+#startOverlay {
+    display: flex !important;
+}
+
+#startOverlay.hidden {
+    display: none !important;
+}
+
 .overlay-content {
     text-align: center;
     color: white;
-    padding: 30px;
+    padding: 40px 35px;
     background: rgba(0, 119, 181, 0.9);
     border-radius: 20px;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
@@ -112,11 +158,12 @@ body {
 
 .overlay-content p {
     font-size: 18px;
-    margin-bottom: 25px;
+    line-height: 27px;
+    margin-bottom: 10px;
 }
 
 .overlay-content button {
-    padding: 12px 30px;
+    padding: 12px 50px;
     font-size: 16px;
     font-weight: 600;
     background: white;
@@ -134,4 +181,29 @@ body {
 
 .overlay-content button:active {
     transform: translateY(0);
+}
+
+.final-likes-pill {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 12px 25px;
+    border-radius: 40px;
+    margin: 5px 0 30px 0;
+    display: inline-block;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    max-width: 280px;
+}
+
+.final-likes-pill span {
+    color: white;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.final-likes-pill span span {
+    font-size: 20px;
+    font-weight: 700;
+    color: #ffd700;
+    margin-left: 5px;
 }

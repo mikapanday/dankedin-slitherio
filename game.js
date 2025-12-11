@@ -22,11 +22,13 @@ const CONFIG = {
 let canvas;
 let ctx;
 let overlay;
+let startOverlay;
 let scoreElement;
 
 function initializeCanvas() {
     canvas = document.getElementById('gameCanvas');
     overlay = document.getElementById('gameOverlay');
+    startOverlay = document.getElementById('startOverlay');
     scoreElement = document.getElementById('score');
     
     if (!canvas) {
@@ -35,7 +37,12 @@ function initializeCanvas() {
     }
     
     if (!overlay) {
-        console.error('Overlay element not found!');
+        console.error('Game overlay element not found!');
+        return false;
+    }
+    
+    if (!startOverlay) {
+        console.error('Start overlay element not found!');
         return false;
     }
     
@@ -912,6 +919,7 @@ let foods = [];
 let mouseX = null;
 let mouseY = null;
 let gameRunning = false;
+let gameLoopInterval = null;
 
 // Initialize Game
 function initGame() {
@@ -980,6 +988,9 @@ function initGame() {
     gameRunning = true;
     if (overlay) {
         overlay.classList.remove('active');
+    }
+    if (startOverlay) {
+        startOverlay.classList.add('hidden');
     }
     if (scoreElement) {
         scoreElement.textContent = playerSnake.getLength();
@@ -1221,11 +1232,38 @@ function gameOver() {
 }
 
 function restartGame() {
+    // Hide game over overlay
+    if (overlay) {
+        overlay.classList.remove('active');
+    }
+    // Reinitialize the game
     initGame();
 }
 
 // Make restartGame globally available
 window.restartGame = restartGame;
+
+// Start game from button click
+function startGameFromButton() {
+    if (startOverlay) {
+        startOverlay.classList.add('hidden');
+    }
+    
+    // Wait a bit for images to start loading, then initialize game
+    // Images will continue loading in background and be assigned as they load
+    setTimeout(() => {
+        // Initialize the game
+        initGame();
+        
+        // Start game loop only if it hasn't started yet
+        if (!gameLoopInterval) {
+            gameLoopInterval = setInterval(gameLoop, 1000 / CONFIG.FPS);
+        }
+    }, 100); // Small delay to let image loading start
+}
+
+// Make startGameFromButton globally available
+window.startGameFromButton = startGameFromButton;
 
 // Initialize game when DOM is ready
 function startGame() {
@@ -1246,15 +1284,7 @@ function startGame() {
     // Ensure canvas is properly sized
     resizeCanvas();
     
-    // Wait a bit for images to start loading, then initialize game
-    // Images will continue loading in background and be assigned as they load
-    setTimeout(() => {
-        // Initialize the game
-        initGame();
-        
-        // Start game loop
-        setInterval(gameLoop, 1000 / CONFIG.FPS);
-    }, 100); // Small delay to let image loading start
+    // Start overlay should be visible by default (no need to add class, it's already visible in CSS)
 }
 
 // Wait for DOM to be ready
