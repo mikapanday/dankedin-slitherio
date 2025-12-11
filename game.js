@@ -7,6 +7,7 @@ const CONFIG = {
     MAX_AI_SNAKE_LENGTH: 200,
     SNAKE_SPEED: 2,
     AI_SPEED: 1.5,
+    INVINCIBILITY_DURATION: 3000,  // 3 seconds of invincibility for player
     FOOD_SIZE: 12,  // Base size (will be randomized per food)
     FOOD_SIZE_MIN: 10,  // Minimum random size
     FOOD_SIZE_MAX: 20,  // Maximum random size
@@ -246,12 +247,25 @@ class Snake {
         this.isDead = false;
         this.color = isPlayer ? '#0077b5' : randomColor();
         this.name = isPlayer ? 'You' : randomName();
+        // Invincibility for player on spawn
+        this.invincible = isPlayer;
+        this.invincibilityStartTime = isPlayer ? Date.now() : 0;
         // Assign a random profile image (will be null if images haven't loaded yet)
-        this.profileImage = getRandomProfileImage();
+        // For AI snakes, respect max 2 duplicates rule
+        if (isPlayer) {
+            this.profileImage = getRandomProfileImage([], false);
+        } else {
+            const excludeList = []; // Will be updated later if player has an image
+            this.profileImage = getRandomProfileImage(excludeList, true, 1);
+        }
         
         // If no image assigned but images exist, try to get one
         if (!this.profileImage && profileImages.length > 0) {
-            this.profileImage = getRandomProfileImage();
+            if (isPlayer) {
+                this.profileImage = getRandomProfileImage([], false);
+            } else {
+                this.profileImage = getRandomProfileImage([], true, 1);
+            }
         }
         
         // Initialize snake with a few segments (world coordinates)
@@ -289,6 +303,14 @@ class Snake {
         if (this.isDead) return;
 
         const head = this.getHead();
+        
+        // Update invincibility timer for player
+        if (this.isPlayer && this.invincible) {
+            const elapsed = Date.now() - this.invincibilityStartTime;
+            if (elapsed >= CONFIG.INVINCIBILITY_DURATION) {
+                this.invincible = false;
+            }
+        }
         
         // Calculate speed based on snake length
         // Smaller snakes are faster, larger snakes are slower
@@ -395,6 +417,7 @@ class Snake {
     }
 
     grow(amount = 1) {
+        // Simply add segments at the tail position - no stretching animation
         const tail = this.segments[this.segments.length - 1];
         for (let i = 0; i < amount; i++) {
             this.segments.push({ ...tail });
@@ -404,6 +427,12 @@ class Snake {
     checkCollision(otherSnake) {
         if (this.isDead || otherSnake.isDead) return false;
         if (this === otherSnake) return false;
+        
+        // If this snake is invincible, it can't die from collisions
+        if (this.invincible) return false;
+        
+        // If other snake is invincible, this snake can't kill it
+        if (otherSnake.invincible) return false;
 
         const thisHead = this.getHead();
         
@@ -433,11 +462,39 @@ class Snake {
 
         const head = this.getHead();
         
+        // Calculate flashing effect for invincible player
+        // Flashes slowly and tapers off until solid
+        let flashAlpha = 1.0;
+        if (this.isPlayer && this.invincible) {
+            const elapsed = Date.now() - this.invincibilityStartTime;
+            const progress = elapsed / CONFIG.INVINCIBILITY_DURATION; // 0 to 1
+            
+            // Slow flash speed that gets slower as time progresses
+            const baseFlashSpeed = 200; // Slower base speed
+            const flashSpeed = baseFlashSpeed * (1 + progress * 2); // Gets slower over time
+            
+            // Flash intensity tapers off (reduces over time)
+            const maxFlashIntensity = 0.7; // Maximum flash intensity at start
+            const minFlashIntensity = 0.1; // Minimum flash intensity at end
+            const flashIntensity = maxFlashIntensity * (1 - progress) + minFlashIntensity * progress;
+            
+            // Base alpha increases over time (tapering to solid)
+            const baseAlpha = 0.3 + progress * 0.7; // Goes from 0.3 to 1.0
+            
+            // Apply slow flashing that tapers off
+            const flash = Math.sin(elapsed / flashSpeed) * flashIntensity;
+            flashAlpha = baseAlpha + flash; // Tapers from flashing to solid
+            
+            // Clamp to valid range
+            flashAlpha = Math.max(0.3, Math.min(1.0, flashAlpha));
+        }
+        
         // Calculate size scaling based on snake length
         // Snake grows in width as it gets longer, with a maximum scale cap
+        // Width increases more frequently (faster scaling)
         const baseLength = 5; // Starting length
         const maxScale = 3; // Maximum width multiplier
-        const lengthScale = Math.min(1 + (this.segments.length - baseLength) / 30, maxScale);
+        const lengthScale = Math.min(1 + (this.segments.length - baseLength) / 15, maxScale); // Faster width growth (was /30, now /15)
         
         // Only draw if head is visible (with margin for long snakes, accounting for scaling)
         const scaledHeadSize = CONFIG.HEAD_SIZE * lengthScale;
@@ -459,7 +516,9 @@ class Snake {
             const size = baseSegmentSize * (0.7 + progress * 0.3);
 
             ctx.fillStyle = this.color;
-            ctx.globalAlpha = 0.3 + progress * 0.7;
+            // Apply invincibility flash effect to body segments
+            const segmentAlpha = (0.3 + progress * 0.7) * flashAlpha;
+            ctx.globalAlpha = segmentAlpha;
             ctx.beginPath();
             ctx.arc(screenSegment.x, screenSegment.y, size / 2, 0, Math.PI * 2);
             ctx.fill();
@@ -475,6 +534,9 @@ class Snake {
         // Draw LinkedIn profile picture (circular)
         // Use the already calculated scaledHeadSize
         const headSize = scaledHeadSize;
+        
+        // Apply invincibility flash effect to head
+        ctx.globalAlpha = flashAlpha;
         
         // Shadow/glow effect
         ctx.shadowBlur = 5;
@@ -509,7 +571,13 @@ class Snake {
         
         // If we have profile images but this snake doesn't have one, try to get one
         if (!hasValidImage && profileImages.length > 0 && !this.profileImage) {
-            this.profileImage = getRandomProfileImage();
+            if (this.isPlayer) {
+                const usedByAI = getUsedProfileImages();
+                this.profileImage = getRandomProfileImage(usedByAI, false);
+            } else {
+                const excludeList = playerSnake && playerSnake.profileImage ? [playerSnake.profileImage] : [];
+                this.profileImage = getRandomProfileImage(excludeList, true, 1);
+            }
         }
         
         if (hasValidImage || (this.profileImage && this.profileImage.complete && this.profileImage.naturalWidth > 0)) {
@@ -548,7 +616,13 @@ class Snake {
             // Fallback: Draw initial letter (only if no profile images are available at all)
             // If profile images exist but this snake doesn't have one, try to get one
             if (profileImages.length > 0 && !this.profileImage) {
-                this.profileImage = getRandomProfileImage();
+                if (this.isPlayer) {
+                    const usedByAI = getUsedProfileImages();
+                    this.profileImage = getRandomProfileImage(usedByAI, false);
+                } else {
+                    const excludeList = playerSnake && playerSnake.profileImage ? [playerSnake.profileImage] : [];
+                    this.profileImage = getRandomProfileImage(excludeList, true, 1);
+                }
                 // If we just got an image, try drawing it (but it might not be loaded yet)
                 if (this.profileImage && this.profileImage.complete && this.profileImage.naturalWidth > 0) {
                     const radius = headSize / 2 - 2;
@@ -572,6 +646,7 @@ class Snake {
                     ctx.stroke();
                 } else {
                     // Image not ready yet, show letter temporarily
+                    ctx.globalAlpha = flashAlpha;
                     ctx.fillStyle = '#ffffff';
                     ctx.font = `bold ${headSize * 0.5}px Arial`;
                     ctx.textAlign = 'center';
@@ -581,6 +656,7 @@ class Snake {
                 }
             } else {
                 // No profile images available, show letter
+                ctx.globalAlpha = flashAlpha;
                 ctx.fillStyle = '#ffffff';
                 ctx.font = `bold ${headSize * 0.5}px Arial`;
                 ctx.textAlign = 'center';
@@ -589,7 +665,9 @@ class Snake {
                 ctx.fillText(initial, 0, 0);
             }
         }
-
+        
+        // Reset alpha after drawing head (in all cases)
+        ctx.globalAlpha = 1.0;
         ctx.restore();
 
         // Draw name above head (optional, for player)
@@ -670,14 +748,14 @@ function loadProfileImages() {
             if (playerSnake && !playerSnake.profileImage) {
                 // Get images used by AI to ensure player gets unique image
                 const usedByAI = getUsedProfileImages();
-                playerSnake.profileImage = getRandomProfileImage(usedByAI);
+                playerSnake.profileImage = getRandomProfileImage(usedByAI, false);
                 console.log('Assigned profile image to player snake');
             }
             aiSnakes.forEach(snake => {
                 if (!snake.profileImage && profileImages.length > 0) {
-                    // AI snakes can share images, but exclude player's image
+                    // AI snakes can share images (max 1 duplicate), but exclude player's image
                     const excludeList = playerSnake && playerSnake.profileImage ? [playerSnake.profileImage] : [];
-                    snake.profileImage = getRandomProfileImage(excludeList);
+                    snake.profileImage = getRandomProfileImage(excludeList, true, 1);
                 }
             });
             
@@ -707,18 +785,41 @@ function loadProfileImages() {
     tryLoadNext();
 }
 
+// Get count of how many times each profile image is used by AI snakes
+function getProfileImageUsageCount() {
+    const usageCount = new Map();
+    aiSnakes.forEach(snake => {
+        if (snake.profileImage) {
+            const count = usageCount.get(snake.profileImage) || 0;
+            usageCount.set(snake.profileImage, count + 1);
+        }
+    });
+    return usageCount;
+}
+
 // Get a random profile image, optionally excluding certain images
-function getRandomProfileImage(excludeImages = []) {
+// Also respects the max 1 duplicate rule for AI snakes (reduced from 2)
+function getRandomProfileImage(excludeImages = [], forAI = false, maxDuplicates = 1) {
     if (profileImages.length === 0) {
         // If no images loaded yet, return null (will use letter fallback)
         return null;
     }
     
     // Filter out excluded images
-    const availableImages = profileImages.filter(img => !excludeImages.includes(img));
+    let availableImages = profileImages.filter(img => !excludeImages.includes(img));
+    
+    // If this is for an AI snake, also filter out images that are already used 2 times
+    if (forAI) {
+        const usageCount = getProfileImageUsageCount();
+        availableImages = availableImages.filter(img => {
+            const count = usageCount.get(img) || 0;
+            return count < maxDuplicates;
+        });
+    }
     
     if (availableImages.length === 0) {
-        // If all images are excluded, return a random one anyway (shouldn't happen with enough images)
+        // If all images are excluded or at max duplicates, return a random one anyway
+        // (shouldn't happen with enough images, but fallback to prevent errors)
         const randomIndex = Math.floor(Math.random() * profileImages.length);
         return profileImages[randomIndex];
     }
@@ -749,23 +850,23 @@ function assignProfileImagesToSnakes() {
     // Assign to player snake if it doesn't have one
     // Make sure player gets a unique image not used by AI
     if (playerSnake && !playerSnake.profileImage) {
-        playerSnake.profileImage = getRandomProfileImage(usedByAI);
+        playerSnake.profileImage = getRandomProfileImage(usedByAI, false);
     } else if (playerSnake && playerSnake.profileImage && usedByAI.includes(playerSnake.profileImage)) {
         // If player's image is being used by AI, get a new unique one
         const excludeList = [playerSnake.profileImage, ...usedByAI];
-        playerSnake.profileImage = getRandomProfileImage(excludeList);
+        playerSnake.profileImage = getRandomProfileImage(excludeList, false);
     }
     
     // Assign to all AI snakes that don't have one
     aiSnakes.forEach(snake => {
         if (!snake.profileImage) {
-            // AI snakes can share images, but exclude player's image
+            // AI snakes can share images (max 1 duplicate), but exclude player's image
             const excludeList = playerSnake && playerSnake.profileImage ? [playerSnake.profileImage] : [];
-            snake.profileImage = getRandomProfileImage(excludeList);
+            snake.profileImage = getRandomProfileImage(excludeList, true, 1);
         } else if (playerSnake && playerSnake.profileImage && snake.profileImage === playerSnake.profileImage) {
             // If this AI snake is using player's image, get a new one
             const excludeList = [playerSnake.profileImage];
-            snake.profileImage = getRandomProfileImage(excludeList);
+            snake.profileImage = getRandomProfileImage(excludeList, true, 1);
         }
     });
 }
@@ -851,10 +952,14 @@ function initGame() {
             y = Math.max(50, Math.min(CONFIG.WORLD_HEIGHT - 50, y));
         }
         const aiSnake = new Snake(x, y, false);
-        // Ensure AI snake doesn't use player's profile image
+        // Ensure AI snake doesn't use player's profile image and respects max 1 duplicate
         if (playerSnake.profileImage && aiSnake.profileImage === playerSnake.profileImage) {
             const excludeList = [playerSnake.profileImage];
-            aiSnake.profileImage = getRandomProfileImage(excludeList);
+            aiSnake.profileImage = getRandomProfileImage(excludeList, true, 1);
+        } else {
+            // Re-assign to ensure max 1 duplicate rule is respected
+            const excludeList = playerSnake.profileImage ? [playerSnake.profileImage] : [];
+            aiSnake.profileImage = getRandomProfileImage(excludeList, true, 1);
         }
         aiSnakes.push(aiSnake);
     }
@@ -863,7 +968,7 @@ function initGame() {
     if (profileImages.length > 0) {
         const usedByAI = getUsedProfileImages();
         if (!playerSnake.profileImage || usedByAI.includes(playerSnake.profileImage)) {
-            playerSnake.profileImage = getRandomProfileImage(usedByAI);
+            playerSnake.profileImage = getRandomProfileImage(usedByAI, false);
         }
     }
     
@@ -977,8 +1082,11 @@ function gameLoop() {
             const playerScale = Math.min(1 + (playerSnake.segments.length - baseLength) / 30, maxScale);
             const scaledHeadSize = CONFIG.HEAD_SIZE * playerScale;
             if (food.checkCollision(head.x, head.y, scaledHeadSize / 2)) {
-                // Grow more when eating a like (grow by 2-3 segments based on food size)
-                const growthAmount = Math.max(2, Math.floor(food.size / 6));
+                // Grow less frequently (smaller height increase per like)
+                // Base growth of 2-3 segments, plus small bonus based on food size
+                const baseGrowth = 2;
+                const sizeBonus = Math.floor(food.size / 8);
+                const growthAmount = baseGrowth + sizeBonus; // Grows by 2-3 segments per like
                 playerSnake.grow(growthAmount);
                 eaten = true;
                 if (scoreElement) {
@@ -998,8 +1106,10 @@ function gameLoop() {
                     const snakeScale = Math.min(1 + (snake.segments.length - baseLength) / 30, maxScale);
                     const scaledHeadSize = CONFIG.HEAD_SIZE * snakeScale;
                     if (food.checkCollision(head.x, head.y, scaledHeadSize / 2)) {
-                        // AI snakes also grow more when eating
-                        const growthAmount = Math.max(2, Math.floor(food.size / 6));
+                        // AI snakes also grow less frequently
+                        const baseGrowth = 2;
+                        const sizeBonus = Math.floor(food.size / 8);
+                        const growthAmount = baseGrowth + sizeBonus; // Grows by 2-3 segments per like
                         snake.grow(growthAmount);
                         eaten = true;
                     }
@@ -1086,11 +1196,9 @@ function gameLoop() {
                         y = Math.max(50, Math.min(CONFIG.WORLD_HEIGHT - 50, y));
                     }
                     const newSnake = new Snake(x, y, false);
-                    // Ensure new AI snake doesn't use player's profile image
-                    if (playerSnake && playerSnake.profileImage && newSnake.profileImage === playerSnake.profileImage) {
-                        const excludeList = [playerSnake.profileImage];
-                        newSnake.profileImage = getRandomProfileImage(excludeList);
-                    }
+                    // Ensure new AI snake doesn't use player's profile image and respects max 1 duplicate
+                    const excludeList = playerSnake && playerSnake.profileImage ? [playerSnake.profileImage] : [];
+                    newSnake.profileImage = getRandomProfileImage(excludeList, true, 1);
                     aiSnakes.push(newSnake);
                 }
             }, 3000);

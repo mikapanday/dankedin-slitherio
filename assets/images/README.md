@@ -8,3 +8,4 @@ The image will be automatically loaded and used for the like buttons in the game
 
 Supported formats: PNG, JPG, SVG, GIF
 
+
